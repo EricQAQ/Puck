@@ -4,10 +4,8 @@ the service.
 """
 
 # -*- coding: utf-8 -*-
-from SocketServer import ForkingMixIn
+from SocketServer import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer, make_server
-
-__author__ = 'Eric Zhang'
 
 
 class BaseServer(object):
@@ -23,15 +21,18 @@ class BaseServer(object):
         pass
 
 
-class NewWSGIServer(ForkingMixIn, WSGIServer):
+class NewWSGIServer(ThreadingMixIn, WSGIServer):
+    """Support multi-thread"""
     pass
 
 
 class WSGIrefServer(BaseServer):
     """Use wsgiref to build a server"""
-    def run(self, app):
+    def run(self, wsgi_handler):
         server = make_server(
-            host=self.host, port=self.port,
-            server_class=NewWSGIServer, app=app
+            host=self.host,
+            port=self.port,
+            app=wsgi_handler,
+            server_class=NewWSGIServer
         )
         server.serve_forever()
