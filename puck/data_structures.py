@@ -4,47 +4,85 @@ from warnings import warn
 
 class Header(object):
     """Store response header.
-    Header class support two ways to initialize:
+    Header class support three ways to initialize:
     1. Supply a dict object, get_content_type
-    2. DO NOT Supply a dict object, but gives key-value pairs, get_content_type
+    2. DO NOT Supply a dict or list object, but gives key-value pairs, get_content_type
+    3. Supply a list object
     """
-    def __init__(self, _dict=None, *args, **kwargs):
-        self._dict = dict()
-        if not _dict:
+    def __init__(self, _dict_list=None, *args, **kwargs):
+        # self._list = [(key, value), (key, value), ...]
+        self._list = []
+        if not _dict_list:
             for key, value in dict(*args, **kwargs).iteritems():
-                self._dict[key] = value
-
-        elif not isinstance(_dict, dict):
+                self._list.append((key, value))
+        elif isinstance(_dict_list, dict):
+            for key, value in _dict_list.iteritems():
+                self._list.append((key, value))
+        elif isinstance(_dict_list, list):
+            self._list.extend(_dict_list)
+        else:
             warn(
                 'The response head is initialized to None, '
-                'because the param is not dict.', UserWarning
+                'because the param is not dict or list.', UserWarning
             )
-        else:
-            for key, value in _dict.iteritems():
-                self._dict[key] = value
 
     def __setitem__(self, key, value):
-        key = self.http_key(key)
-        value = str(value)
-        self._dict[key] = value
+        if isinstance(key, int):
+            self._list[key] = value
+        else:
+            key = self.http_key(key)
+            for _id, (_key, _value) in enumerate(self._list):
+                if _key == key:
+                    self._list[_id] = (_key, str(_value))
+                    break
+            else:
+                self.add(key, str(value))
 
     def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._list[item]
         item = self.http_key(item)
-        return self._dict[item]
+        for key, value in self._list:
+            if key == item:
+                return value
 
     def __delitem__(self, key):
-        key = self.http_key(key)
-        del self._dict[key]
+        if isinstance(key, int):
+            del self._list[key]
+        else:
+            key = self.http_key(key)
+            for _id, _key, _value in enumerate(self._list):
+                if key == _key:
+                    del self._list[_id]
 
     def __iter__(self):
-        return iter(self._dict)
+        return iter(self._list)
+
+    def add(self, key, value):
+        self._list.append((key, value))
 
     def http_key(self, key):
         """content-type --> Content-Type"""
         return key.replace('_', '-').title()
 
+    def head_to_list(self, charset='utf-8'):
+        result = []
+        for key, value in self:
+            if isinstance(value, unicode):
+                value = value.encode(charset)
+            else:
+                value = str(value)
+            result.append((key, value))
+        return result
 
-class RequestHeader(Header):
+    def __str__(self):
+        string = ''
+        for key, value in self.head_to_list():
+            string += '%s: %s\r\n' % (key, value)
+        return string
+
+
+class EnvironHeader(object):
 
     def __init__(self, environ):
         self.environ = environ
