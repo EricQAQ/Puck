@@ -41,6 +41,8 @@ def generate_cookie(key, value, expires=None, path='/', domain=None,
                    readable by the domain "www.example.com"
     :param max_age: should be a number of seconds or None.
     :param secure: The cookie will only be available via HTTPS
+
+    :return morsel: Type is Morsel.
     """
 
     morsel = Morsel()
@@ -59,5 +61,5 @@ def generate_cookie(key, value, expires=None, path='/', domain=None,
         if value is not None and value is not False:
             morsel[key] = value
 
-    return morsel.output()
+    return morsel
 
