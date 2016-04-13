@@ -1,10 +1,14 @@
 from local import LocalStack
 from request import Request
-from data_structures import Router
+from response import Response
+from routing import Router
+from .exceptions import HTTPException
+
 
 class Puck(object):
 
     request_class = Request
+    response_class = Response
 
     def __init__(self):
 
@@ -40,6 +44,7 @@ class Puck(object):
     def add_route(self, url, handler, **options):
         """Add new rule to url_handler_map"""
         options.setdefault('methods', ('GET',))
+        options.setdefault('rule_name', handler.__name__)
         self.url_handler_map.add(url, handler, **options)
 
     def before_request(self, func):
@@ -52,8 +57,12 @@ class Puck(object):
         self.after_request_funcs.append(func)
         return func
 
-    def match_url(self, url, method='GET'):
-        pass
+    def match_url(self, url):
+        """According the request url, to matching the handler.
+        If cannot find a handler, return (None, None, None)
+
+        :return: (function, methods, params)"""
+        return self.url_handler_map.match_url(url)
 
     def process_before_request(self):
         """Called the functions before dispatching the request url, which
@@ -74,6 +83,33 @@ class Puck(object):
         return response
 
     def make_response(self, response):
+        status = header = None
+
+        if isinstance(response, tuple):
+            response, status, header = response + (None,) * (3 - len(response))
+
+        if not isinstance(response, self.response_class):
+            if status is None:
+                response = self.response_class(response_body=response, header=header)
+            else:
+                response = self.response_class(response_body=response, header=header, status=status)
+
+        if isinstance(response, basestring):
+            response = self.response_class(response_body=response.encode('utf-8'))
+
+        return response
+
+    def handle(self, handler, methods, request_method, params):
+        if not handler:
+            self.notfound()
+        if request_method not in methods:
+            self.abort(405)
+        return handler(**params)
+
+    def notfound(self):
+        pass
+
+    def abort(self, status_code):
         pass
 
     def __call__(self, environ, start_response):
@@ -84,13 +120,21 @@ class Puck(object):
             if result is None:
                 request_url = current_request.request.path
                 request_method = current_request.request.methods
-
-                handler = self.match_url(request_url, request_method)
-                result = handler(*args, **kwargs)
+                try:
+                    handler, methods, params = self.match_url(request_url)
+                    result = self.handle(handler, methods, request_method, params)
+                except HTTPException as e:
+                    pass
 
             response = self.make_response(result)
             response = self.process_after_request(response)
             return response(environ, start_response)
+
+    def run(self, host='127.0.0.1', port='8888', **options):
+        # options.setdefault('use_server', 'WSGIrefServer')
+        from server import WSGIrefServer
+        httpd = WSGIrefServer(host=host, port=port, **options)
+        httpd.run(self)
 
 
 class _RequestStack(object):
@@ -108,3 +152,5 @@ class _RequestStack(object):
 
 
 request_stack = LocalStack()
+request = request_stack.top.request if request_stack.top else None
+current_app = request_stack.top.app if request_stack.top else None
