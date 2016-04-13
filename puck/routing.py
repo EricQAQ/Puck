@@ -1,4 +1,5 @@
 import re
+from urllib import urlencode
 
 # this regular expression for matching dynamic routing rule.
 # Ex: /example/<int:test>
@@ -66,7 +67,7 @@ class Rule(object):
         self.base_rule = self.build_base_rule()
 
         # the url in Regular Expression.
-        self.rule_re = self.complie_rule()
+        self.rule_re = re.compile(self.complie_rule())
 
     def complie_rule(self):
         rule_re = '^/'
@@ -78,6 +79,8 @@ class Rule(object):
                 rule_re += r'(?P<{variable}>{type_replace})/'.format(
                     variable=variable, type_replace=type_replace
                 )
+        if rule_re == '^//':
+            return '^/$'
         return rule_re.rstrip('/') + '$'
 
     def build_base_rule(self):
@@ -96,6 +99,33 @@ class Rule(object):
             else:
                 rule += '{' + variable + '}' + '/'
         return rule.rstrip('/')
+
+    def build_url(self, **kwargs):
+        """According the params to build full url. Example:
+            " /example/{id}  -> /example/1"
+        """
+        variable_dict = self.get_variables()
+        unknown_variable = set()
+        # check type and find out unknown variable
+        for key, value in kwargs:
+            if key in variable_dict and \
+                    not isinstance(value, variable_dict[key]):
+                raise TypeError
+            elif key not in variable_dict:
+                unknown_variable.add(key)
+        url = self.base_rule.format(**kwargs)
+        if unknown_variable:
+            url += '?' + urlencode(
+                {k: kwargs[k] for k in unknown_variable}
+            )
+        return url
+
+    def get_variables(self):
+        _dict = {}
+        for varibale, _type in self.match_order:
+            if _type is not None:
+                _dict[varibale] = _type
+        return _dict
 
     def _analysize_rule(self, rule):
         """Analysize the url, get and save the key-value dict. Example:
@@ -143,12 +173,42 @@ class Router(object):
         self.name_to_func = []
 
     def add(self, url, handler, **kwargs):
-        pass
+        """Add new url rule. Called by add_route in Puck.
+
+        :param url: the url rule will be added.
+        :param handler: the relative function to the url rule. That is, if receiving a request to
+                        THE url, it will be mapped to THE function to handle the request.
+        :param methods: the methods that allows to this url.
+        """
+        rule_name = kwargs['rule_name']
+        methods = set(method.upper() for method in kwargs['methods'])
+        if 'GET' in methods and 'HEAD' not in methods:
+            methods.add('HEAD')
+        rule = Rule(rule_str=url, rule_name=rule_name, methods=methods)
+
+        self.route_to_name.append((rule_name, rule))
+        self.name_to_func.append((rule_name, handler))
 
     def url_for(self, rule_name, **kwargs):
         """According to the giving rule name(default value is function name)
         and params, build the url which matches the function."""
-        pass
+        for _rule_name, rule in self.route_to_name:
+            if _rule_name == rule_name:
+                return rule.build_url(**kwargs)
+        return ''
 
     def match_url(self, url):
-        pass
+        """According the request url, to matching the handler.
+        :return: (function, methods, params)"""
+        for rule_name, rule in self.route_to_name:
+            m = rule.rule_re.match(url)
+            if m is not None:
+                func = self._search_func(rule_name)
+                return func, rule.methods, m.groupdict()
+        return None, None, None
+
+    def _search_func(self, name):
+        for _name, func in self.name_to_func:
+            if name == _name:
+                return func
+        return None
