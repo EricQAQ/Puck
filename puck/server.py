@@ -1,19 +1,16 @@
+# -*- coding: utf-8 -*-
 """
 In this file, mainly handle choosing which WSGI Server to start
 the service.
 """
 
-# -*- coding: utf-8 -*-
-from SocketServer import ThreadingMixIn
-from wsgiref.simple_server import WSGIServer, make_server
-
 
 class BaseServer(object):
     """Base Server class"""
-    def __init__(self, host, port, **kwargs):
+    def __init__(self, host, port, **options):
         self.host = host
         self.port = port
-        self.kws = kwargs
+        self.options = options
 
     def run(self, app):
         """To start the TCP server.
@@ -21,18 +18,15 @@ class BaseServer(object):
         pass
 
 
-class NewWSGIServer(ThreadingMixIn, WSGIServer):
-    """Support multi-thread"""
-    pass
-
-
 class WSGIrefServer(BaseServer):
     """Use wsgiref to build a server"""
-    def run(self, wsgi_handler):
+    def run(self, app):
+        from wsgiref.simple_server import make_server
+
         server = make_server(
             host=self.host,
             port=self.port,
-            app=wsgi_handler,
-            server_class=NewWSGIServer
+            app=app,
+            **self.options
         )
         server.serve_forever()
