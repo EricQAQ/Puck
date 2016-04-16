@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
 import warnings
 from Cookie import SimpleCookie
 
-from data_structures import Header
-from utils import generate_content_type
-from cookies import generate_cookie
+from .data_structures import Header
+from .utils import generate_content_type
+from .cookies import generate_cookie
+from .constants import HTTP_CODES
 
 
 class BaseResponse(object):
@@ -50,9 +52,12 @@ class BaseResponse(object):
         else:
             # Ex: status = 200
             try:
-                self.status_code = int(status)
+                # self.status_code = int(status)
+                self.status = '%d %s' % (int(status), HTTP_CODES[int(status)])
             except TypeError:
-                self.status_code = self.default_status
+                # self.status_code = self.default_status
+                self.status = '%d %s' % (
+                    self.default_status, HTTP_CODES[self.default_status])
                 warnings.warn(
                     'Status code is initialized to 200, Because the '
                     'status code should be int.',
@@ -61,9 +66,13 @@ class BaseResponse(object):
 
         # Get the response body
         if response_body is None:
-            self.response = {}
+            self.response = []
         else:
             self.response = response_body
+
+    @property
+    def is_sequence(self):
+        return isinstance(self.response, (list, tuple))
 
     @property
     def cookies(self):
@@ -112,6 +121,63 @@ class BaseResponse(object):
     # def _create_cookies(self, mosel):
     #     """Create a cookies attribute for response."""
     #     return self.cookies.append(SimpleCookie(mosel.output()))
+
+    def get_header_list(self):
+        """Turn the response header into a list. The header is a instance of Header,
+        use this func to get attribute which name is ' _list '.
+        """
+        for item in self.cookies:
+            self.header.add('Set-Cookie', item.OutputString())
+        if self.is_sequence and 'Content-Length' not in self.header:
+            try:
+                content_length = sum((len(str(item))) for item in self.response)
+            except UnicodeError:
+                pass
+            else:
+                self.header.add('Content-Length', str(content_length))
+        return self.header.head_to_list(charset=self.charset)
+
+    def iterable_item(self, environ):
+        """ Generate a iterable object, and use this object to return.
+
+        :param environ: the WSGI environment
+        :return: a iterable response
+        """
+        status_code = int(self.status[:3])
+        if environ['REQUEST_METHOD'] == 'HEAD' or \
+                    100 <= status_code < 200 or status_code in (204, 304):
+            yield ()
+
+        for item in self.response:
+            if isinstance(item, unicode):
+                yield item.encode(self.charset)
+            else:
+                yield str(item)
+
+    def wsgi_response(self, environ):
+        """Return the WSGI response as a tuple.
+
+        :param environ: the WSGI environment
+        :return: (obj_iter, status, header_list)
+                 the first one is a iterable object, the second one is a string showing
+                 the response status, like '200 OK', the last one is the list of the
+                 response header.
+        """
+        obj_iter = self.iterable_item(environ)
+        return obj_iter, self.status, self.get_header_list()
+
+    def __call__(self, environ, start_response):
+        """Make instance of Response class as a WSGI application.
+
+        :param environ: the WSGI environment
+        :param start_response: the response callable provided by the WSGI
+                               server.
+        :return: an iterable object.
+        """
+        obj_iter, status, headers = self.wsgi_response(environ)
+        start_response(status, headers)
+
+        return obj_iter
 
 
 class Response(BaseResponse):
