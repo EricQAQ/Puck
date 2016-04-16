@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
 import re
 from urllib import urlencode
+
+from .exceptions import NotFound, MethodNotAllowed
 
 # this regular expression for matching dynamic routing rule.
 # Ex: /example/<int:test>
@@ -17,7 +20,7 @@ _rule_re = re.compile(r'''
 _type_map = {
     'int': r'\d+',
     'float': r'\d+(?:\.\d+)',
-    'str': r'.+',
+    'str': r'[\w-]+',
 }
 
 
@@ -197,15 +200,18 @@ class Router(object):
                 return rule.build_url(**kwargs)
         return ''
 
-    def match_url(self, url):
+    def match_url(self, url, method):
         """According the request url, to matching the handler.
         :return: (function, methods, params)"""
         for rule_name, rule in self.route_to_name:
             m = rule.rule_re.match(url)
             if m is not None:
                 func = self._search_func(rule_name)
-                return func, rule.methods, m.groupdict()
-        return None, None, None
+                if method not in rule.methods:
+                    raise MethodNotAllowed()
+                return func, m.groupdict()
+        raise NotFound()
+        # return None, None, None
 
     def _search_func(self, name):
         for _name, func in self.name_to_func:
