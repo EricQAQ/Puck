@@ -4,8 +4,9 @@ try:
 except ImportError:
     from cgi import parse_qs
 
-from utils import Header
-from cookies import parse_cookie
+from .data_structures import EnvironHeader
+from .cookies import parse_cookie
+from .utils import parse_form_data
 
 
 def get_host(environ):
@@ -31,12 +32,12 @@ class BaseRequest(object):
         self.environ = environ
 
     @property
-    def methods(self):
+    def method(self):
         return self.environ.get('REQUEST_METHOD', 'get').upper()
 
     @property
     def headers(self):
-        return Header(self.environ)
+        return EnvironHeader(self.environ)
 
     @property
     def cookies(self):
@@ -62,6 +63,10 @@ class BaseRequest(object):
         return path
 
     @property
+    def content_type(self):
+        return self.environ.get('CONTENT_TYPE', '')
+
+    @property
     def request_params(self):
         """return the request params. Example:
         1. user try to visit http://example.com/?key=value&a=b, method is GET:
@@ -82,6 +87,18 @@ class BaseRequest(object):
             else:
                 params[key] = value
         return params
+
+    @property
+    def form(self):
+        if self.method not in ('POST', 'PUT'):
+            return {}
+
+        d = self.__dict__
+        d['_form'] = parse_form_data(self.environ)
+        return self._form
+
+    def file(self):
+        pass
 
 
 class Request(BaseRequest):
