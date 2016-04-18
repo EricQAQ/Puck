@@ -1,8 +1,11 @@
-from local import LocalStack
-from request import Request
-from response import Response
-from routing import Router
-from .exceptions import HTTPException
+# -*- coding: utf-8 -*-
+from .request import Request
+from .response import Response
+from .routing import Router
+from .constants import HTTP_CODES
+from .globals import request_stack, request
+
+from .exceptions import HTTPException, NotFound, MethodNotAllowed
 
 
 class Puck(object):
@@ -25,7 +28,6 @@ class Puck(object):
         # functions, and thes functions may change the response
         # object.
         self.after_request_funcs = []
-        pass
 
     def route(self, url, **options):
         """Decorator for request handler. Add rules.
@@ -57,12 +59,12 @@ class Puck(object):
         self.after_request_funcs.append(func)
         return func
 
-    def match_url(self, url):
+    def match_url(self, url, method):
         """According the request url, to matching the handler.
         If cannot find a handler, return (None, None, None)
 
         :return: (function, methods, params)"""
-        return self.url_handler_map.match_url(url)
+        return self.url_handler_map.match_url(url, method)
 
     def process_before_request(self):
         """Called the functions before dispatching the request url, which
@@ -89,48 +91,54 @@ class Puck(object):
             response, status, header = response + (None,) * (3 - len(response))
 
         if not isinstance(response, self.response_class):
-            if status is None:
-                response = self.response_class(response_body=response, header=header)
+            if isinstance(response, basestring):
+                response = self.response_class(
+                    response_body=response.encode('utf-8'), header=header)
             else:
-                response = self.response_class(response_body=response, header=header, status=status)
+                response = self.response_class(response_body=response, header=header)
 
-        if isinstance(response, basestring):
-            response = self.response_class(response_body=response.encode('utf-8'))
+        if status is not None:
+            if isinstance(status, basestring):
+                response.status = status
+            else:
+                response.status = '%d %s' % (status, HTTP_CODES[status])
 
         return response
 
-    def handle(self, handler, methods, request_method, params):
-        if not handler:
-            self.notfound()
-        if request_method not in methods:
-            self.abort(405)
-        return handler(**params)
+    # def handle(self, handler, methods, request_method, params):
+    #     if handler is None:
+    #         self.notfound()
+    #     if request_method not in methods:
+    #         self.abort(405)
+    #     return handler(**params)
 
-    def notfound(self):
-        pass
-
-    def abort(self, status_code):
-        pass
+    # def notfound(self):
+    #     raise NotFound()
+    #
+    # def abort(self, status_code):
+    #     raise MethodNotAllowed()
 
     def __call__(self, environ, start_response):
         """WSGI interface. The server will call the instance of Puck, use
         this function to handling request. """
-        with _RequestStack(self, environ) as current_request:
+        with _RequestStack(self, environ):
             result = self.process_before_request()
             if result is None:
-                request_url = current_request.request.path
-                request_method = current_request.request.methods
+                request_url = request.path
+                request_method = request.method
+
                 try:
-                    handler, methods, params = self.match_url(request_url)
-                    result = self.handle(handler, methods, request_method, params)
-                except HTTPException as e:
-                    pass
+                    handler, params = self.match_url(request_url, request_method)
+                    result = handler(**params)
+                    # result = self.handle(handler, methods, request_method, params)
+                except HTTPException as ex_response:
+                    return ex_response(environ, start_response)
 
             response = self.make_response(result)
             response = self.process_after_request(response)
             return response(environ, start_response)
 
-    def run(self, host='127.0.0.1', port='8888', **options):
+    def run(self, host='127.0.0.1', port=8888, **options):
         # options.setdefault('use_server', 'WSGIrefServer')
         from server import WSGIrefServer
         httpd = WSGIrefServer(host=host, port=port, **options)
@@ -149,8 +157,3 @@ class _RequestStack(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_tb is None:
             request_stack.pop()
-
-
-request_stack = LocalStack()
-request = request_stack.top.request if request_stack.top else None
-current_app = request_stack.top.app if request_stack.top else None
