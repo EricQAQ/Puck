@@ -1,6 +1,8 @@
 # -*— coding:utf-8 -*-
 from warnings import warn
 
+CHUNK_SIZE = 1024 * 10
+
 
 def http_key(key):
     """content-type --> Content-Type"""
@@ -115,3 +117,78 @@ class EnvironHeader(object):
     def handle_http_key(self, key):
         """content-type --> CONTENT_TYPE"""
         return key.upper().replace('-', '_')
+
+
+class IterStream(object):
+
+    def __init__(self, stream, end):
+        self._pos = 0
+        self.end = end
+        self._read = stream.read
+        self._readline = stream.readline
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration()
+        if line[-2:] == '\r\n':
+            return line[:-2]
+        return line
+
+    def read(self, size=CHUNK_SIZE):
+        if self._pos >= self.end:
+            return ''
+        read = self._read(min(self.end-self._pos, size))
+        self._pos += len(read)
+        return read
+
+    def readline(self, size=None):
+        if self._pos >= self.end:
+            return ''
+        if size is None:
+            size = self.end - self._pos
+        else:
+            size = min(self.end-self._pos, size)
+        line = self._readline(size)
+
+        self._pos += len(line)
+        return line
+
+
+class File(object):
+
+    def __init__(self, stream, file_name, content_type='application/octet-stream'):
+        self.file_name = file_name
+        self.stream = stream
+        self.content_type = content_type
+
+    def read_data_from_stream(self, stream, chunk_size=CHUNK_SIZE):
+        stream.seek(0)
+        while True:
+            data = stream.read(chunk_size)
+            if not data:
+                break
+            yield data
+
+    def create(self, destination):
+        with open(destination, 'w+b') as f:
+            for data in self.read_data_from_stream(self.stream):
+                f.write(data)
+        self.close()
+
+    def close(self):
+        """Close the underlying file if possible."""
+        try:
+            self.stream.close()
+        except:
+            pass
+
+    def __repr__(self):
+        return '<%s: %r (%r)>' % (
+            self.__class__.__name__,
+            self.file_name,
+            self.content_type
+        )
