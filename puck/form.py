@@ -3,6 +3,13 @@ import urlparse
 import tempfile
 
 from .utils import parse_header_line, parse_dict_string
+from .data_structures import IterStream, File
+
+
+def valid_boundary(s, _vb_pattern="^[ -~]{0,200}[!-~]$"):
+    """Valid the boundary string is valid or not. Reference cgi."""
+    import re
+    return re.match(_vb_pattern, s)
 
 
 def parse_form_data(environ):
@@ -23,20 +30,118 @@ def parse_form_data(environ):
 
     if content_type == 'multipart/form-data':
         # POST or PUT Request submit a form, may have a file.
-        form, file = parse_multipart(
+        _form, _file = parse_multipart(
             environ['wsgi.input'], content_length, flag.get('boundary')
         )
 
     elif content_type == 'application/x-www-form-urlencoded':
         # POST or PUT Request just submit a form, without a file.
-        form = read_urlencoded(environ['wsgi.input'].read(content_length))
+        _form = read_urlencoded(environ['wsgi.input'].read(content_length))
     else:
         pass
 
-    return form, file
+    return _form, _file
+
+
+def parse_multipart(file, content_length, boundary):
+    """Parse file to form and file. Only called when ' Content-Type = multipart/form-data '
+
+    The Request always like following block(leave out some unnecessary information.), Note
+    that in HTTP header, usually using CRLF(\r\n) to end one line.
+
+    POST http://www.example.com HTTP/1.1
+    Content-Type:multipart/form-data; boundary=----WebKitFormBoundaryrGKCBY7qhFd3TrwA
+    ------WebKitFormBoundaryrGKCBY7qhFd3TrwA        (-----------> real_boundary)
+    Content-Disposition: form-data; name="text"
+
+    title
+    ------WebKitFormBoundaryrGKCBY7qhFd3TrwA
+    Content-Disposition: form-data; name="file"; filename="chrome.png"
+    Content-Type: image/png
+
+    PNG ... content of chrome.png ...
+    ------WebKitFormBoundaryrGKCBY7qhFd3TrwA--      (-----------> last_boundary)
+
+    :param file: the file will be parsed. Usually the file is environ['wsgi.input']
+    :param content_length: the length of the file
+    :param boundary: the delimiter used in 'multipart/form-data', use this to split
+                     key-value pairs
+
+    :return (form, file)
+            form is a list, which structure likes [(key1, val1), (key2, val2), (key3, val3), ...]
+            file is a list, which structure likes [(name1, File object1), (name2, File object2), ...]
+    """
+    if not boundary:
+        raise ValueError('Missing boundary, which is necessary.')
+    if not valid_boundary(boundary):
+        raise ValueError('Invalid boundary in multipart form.')
+    real_boundary = '--' + boundary
+    last_boundary = real_boundary + '--'
+
+    file = IterStream(file, content_length)
+    _form = []
+    _file = []
+
+    exit_flag = False
+
+    line = file.next()      # boundary
+
+    if line != real_boundary:
+        raise ValueError('Cannot found boundary in the start of data.')
+
+    while not exit_flag:
+        sub_header = file.next()    # Content-Disposition: form-data; name="file"; filename="chrome.png"
+        sub_header = parse_header_line(sub_header)
+        if sub_header[0] != 'Content-Disposition: form-data':
+            raise ValueError('Missing Content-Disposition header.')
+        name = sub_header[1].get('name')
+        filename = sub_header[1].get('filename')
+
+        if filename is None:
+            is_file = False
+            container = []
+            _write = container.append
+        else:
+            is_file = True
+            content_type = parse_dict_string(parse_header_line(file.next())[0]).get('Content-Type')
+            container = tempfile.TemporaryFile()
+            _write = container.write
+
+        for line in file:
+            if line == real_boundary:
+                break
+            if line == last_boundary:
+                exit_flag = True
+                break
+            if not line:    # blank line
+                continue
+
+            if line[-2:] == '\r\n':
+                _write(line[:-2])
+            else:
+                _write(line[:])
+
+        if is_file:
+            _file.append((name, File(container, filename, content_type)))
+        else:
+            _form.append((name, container))
+
+    return _form, _file
 
 
 def read_urlencoded(s, keep_blank_values=0, strict_parsing=0):
+    """Called when ' Content-Type = application/x-www-form-urlencoded '.
+
+    In this situation, the environ['wsgi.input'] like this:
+
+        test=aaa&test1=bbb&test2=ccc
+
+    So through method of parsing url can get the key-value pairs, and store the pairs
+    in _form list.
+
+    :param s: the string will be parsed, Usually is environ['wsgi.input']
+    :param keep_blank_values: whether keep blank or not
+    """
     _list = []
     for key, value in urlparse.parse_qsl(s, keep_blank_values, strict_parsing):
         _list.append((key, value))
