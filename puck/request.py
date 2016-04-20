@@ -6,7 +6,8 @@ except ImportError:
 
 from .data_structures import EnvironHeader
 from .cookies import parse_cookie
-from .utils import parse_form_data
+from .form import parse_form_data
+from .utils import lazy_property
 
 
 def get_host(environ):
@@ -31,42 +32,42 @@ class BaseRequest(object):
     def __init__(self, environ):
         self.environ = environ
 
-    @property
+    @lazy_property
     def method(self):
         return self.environ.get('REQUEST_METHOD', 'get').upper()
 
-    @property
-    def headers(self):
+    @lazy_property
+    def header(self):
         return EnvironHeader(self.environ)
 
-    @property
+    @lazy_property
     def cookies(self):
         """return the cookie.
         The cookie is a dict, user can get the key and value in dict way"""
         return parse_cookie(self.environ)
 
-    @property
+    @lazy_property
     def request_addr(self):
         """Get request address"""
         # TODO: Add support get real request address when use proxy(HTTP_X_FORWARDED_FOR)
         return self.environ['REMOTE_ADDR']
 
-    @property
+    @lazy_property
     def host(self):
         """Get real host address."""
         return get_host(self.environ)
 
-    @property
+    @lazy_property
     def path(self):
         path = '/' + self.environ.get('PATH_INFO', '').lstrip('/')
         # TODO 需要改变编码方式
         return path
 
-    @property
+    @lazy_property
     def content_type(self):
         return self.environ.get('CONTENT_TYPE', '')
 
-    @property
+    @lazy_property
     def request_params(self):
         """return the request params. Example:
         1. user try to visit http://example.com/?key=value&a=b, method is GET:
@@ -88,17 +89,20 @@ class BaseRequest(object):
                 params[key] = value
         return params
 
-    @property
+    @lazy_property
     def form(self):
         if self.method not in ('POST', 'PUT'):
             return {}
 
         d = self.__dict__
-        d['_form'] = parse_form_data(self.environ)
+        d['_form'], d['_file'] = parse_form_data(self.environ)
         return self._form
 
+    @lazy_property
     def file(self):
-        pass
+        d = self.__dict__
+        d['_form'], d['_file'] = parse_form_data(self.environ)
+        return self._file
 
 
 class Request(BaseRequest):

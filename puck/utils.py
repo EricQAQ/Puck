@@ -41,3 +41,17 @@ def parse_dict_string(s):
     """
     parts = s.split(':')
     return {parts[0]: parts[1][1:]}
+
+
+def lazy_property(func):
+    name = '__lazy__' + func.__name__
+
+    @property
+    def lazy(self):
+        if hasattr(self, name):
+            return getattr(self, name)
+        else:
+            value = func(self)
+            setattr(self, name, value)
+            return value
+    return lazy
