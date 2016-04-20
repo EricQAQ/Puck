@@ -1,10 +1,10 @@
+# -*- coding: utf-8 -*-
 try:
     from greenlet import getcurrent as get_current_greenlet
 except ImportError:
     get_current_greenlet = int
 
 from thread import get_ident as get_current_thread
-
 from threading import Lock
 
 

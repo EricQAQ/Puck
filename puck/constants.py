@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 HTTP_CODES = {
     100:    'Continue',
     101:    'Switching Protocols',
