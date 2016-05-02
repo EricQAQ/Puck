@@ -2,7 +2,7 @@
 import re
 from urllib import urlencode
 
-from .exceptions import NotFound, MethodNotAllowed
+#from .exceptions import NotFound, MethodNotAllowed
 
 # this regular expression for matching dynamic routing rule.
 # Ex: /example/<int:test>
@@ -25,6 +25,15 @@ _type_map = {
 
 
 def parse_rule(rule):
+    """Parse the rule of url. This func is a generater.
+
+        s = '/example/<int:t>/test'
+        l = []
+        for key, value in parse_rule(s):
+            l.append((key, value))
+
+    The l is: [(example, None), (t, int), (test, None)]
+    """
     rule = rule.rstrip('/').lstrip('/')
     rule_list = rule.split('/')
     for item in rule_list:
@@ -61,8 +70,11 @@ class Rule(object):
         self.dynamic = False
 
         # if the rule is a dynamic rule, use this param to store the variables
+        # It will be like this: {'t': <type 'int'>}
         self.type_variable = {}
 
+        # analysize the rule of url
+        # it will set self.match_order, self.dynamic, self.type_variable
         self._analysize_rule(self.rule)
 
         # the url like "/example/{test}/{test2}"
@@ -70,9 +82,16 @@ class Rule(object):
         self.base_rule = self.build_base_rule()
 
         # the url in Regular Expression.
+        # This is NOT a string, instance a object of RE
         self.rule_re = re.compile(self.complie_rule())
 
     def complie_rule(self):
+        """Comple the rule of url into a string of Regular Expression.
+
+            >>> r = Rule('/example/<int:test>/<int:test2>', methods=['GET, POST'])
+            >>> print r.complie_rule()
+            ^/example/(?P<test>\d+)/(?P<test2>\d+)$
+        """
         rule_re = '^/'
         for variable, _type in self.match_order:
             if not _type:
@@ -88,9 +107,8 @@ class Rule(object):
 
     def build_base_rule(self):
         """To build the base url. Example:
-            >>>r = Rule('/example/<int:test>/<int:test2>', methods=['GET, POST'])
-            >>>print r.build_base_rule()
-        Output:
+            >>> r = Rule('/example/<int:test>/<int:test2>', methods=['GET, POST'])
+            >>> print r.build_base_rule()
             /example/{test}/{test2}
         """
         if not self.dynamic:
@@ -105,7 +123,7 @@ class Rule(object):
 
     def build_url(self, **kwargs):
         """According the params to build full url. Example:
-            " /example/{id}  -> /example/1"
+            " /example/{id}  -> /example/1 "
         """
         variable_dict = self.get_variables()
         unknown_variable = set()
@@ -124,6 +142,7 @@ class Rule(object):
         return url
 
     def get_variables(self):
+        """Get the dict of the variables in the url."""
         _dict = {}
         for varibale, _type in self.match_order:
             if _type is not None:
@@ -132,15 +151,13 @@ class Rule(object):
 
     def _analysize_rule(self, rule):
         """Analysize the url, get and save the key-value dict. Example:
-            >>>s = '/example/<int:t>/test'
-            >>>r3 = Rule(s)
-            >>>r.build_rule()
-            >>>print r3.dynamic
-            >>>print r3.type_variable
-            >>>print r3.match_order
-        Output:
+            >>> s = '/example/<int:t>/test'
+            >>> r = Rule(s)
+            >>> print r.dynamic
             True
+            >>> print r.type_variable
             {'t': <type 'int'>}
+            >>> print r.match_order
             [('example', None), ('t', <type 'int'>), ('test', None)]
         """
         for _type, variable, rule_item in parse_rule(rule):
