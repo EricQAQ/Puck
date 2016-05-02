@@ -120,8 +120,15 @@ class EnvironHeader(object):
 
 
 class IterStream(object):
-
+    """
+    Make an instance of the object, which can get the data which size is limited.
+    """
     def __init__(self, stream, end):
+        """Init the IterStream.
+
+        :param stream: the data stream
+        :param end: the size of the data
+        """
         self._pos = 0
         self.end = end
         self._read = stream.read
@@ -139,6 +146,7 @@ class IterStream(object):
         return line
 
     def read(self, size=CHUNK_SIZE):
+        """Read the stream, if the size is given, read the constant size data."""
         if self._pos >= self.end:
             return ''
         read = self._read(min(self.end-self._pos, size))
@@ -166,6 +174,7 @@ class File(object):
         self.content_type = content_type
 
     def read_data_from_stream(self, stream, chunk_size=CHUNK_SIZE):
+        """Get the constant size data from the stream. It is a generater."""
         stream.seek(0)
         while True:
             data = stream.read(chunk_size)
@@ -174,6 +183,7 @@ class File(object):
             yield data
 
     def create(self, destination):
+        """Create a new file, and set data of the stream into the file."""
         with open(destination, 'w+b') as f:
             for data in self.read_data_from_stream(self.stream):
                 f.write(data)

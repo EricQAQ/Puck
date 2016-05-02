@@ -84,7 +84,19 @@ class Puck(object):
             response = func(response)
         return response
 
+    def get_session(self):
+        pass
+
+    def save_session(self):
+        pass
+
     def make_response(self, response):
+        """
+        Make response.
+
+        1. if the param response is a tuple, this func will create an instance of Response
+        2. Set the status of the instance of Response.
+        """
         status = header = None
 
         if isinstance(response, tuple):
@@ -146,10 +158,19 @@ class Puck(object):
 
 
 class _RequestStack(object):
+    """
+    The stack of the request. When the request comes to Puck, use this class like this:
 
+        with _RequestStack(Puck, environ):
+            xxx
+            xxx
+    Use this context, it will push the current app, the current request and the session
+    into the LocalStack
+    """
     def __init__(self, app, environ):
         self.app = app
         self.request = app.request_class(environ)
+        self.session = app.get_session()
 
     def __enter__(self):
         request_stack.push(self)

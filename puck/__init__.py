@@ -29,9 +29,10 @@
     SOFTWARE.
 """
 
+version_info = (0, 1, 0)
 
 __author__ = 'Eric Zhang'
-__version__ = '0.1.0'
+__version__ = ".".join([str(v) for v in version_info])
 __email__ = 'eric.pucker@gmail.com'
 __license__ = 'MIT'
 __copyright__ = 'Copyright (c) 2016 Eric in NEU'
