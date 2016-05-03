@@ -95,13 +95,18 @@ class BaseRequest(object):
             return {}
 
         d = self.__dict__
-        d['_form'], d['_file'] = parse_form_data(self.environ)
+        if '_form' not in d:
+            d['_form'], d['_file'] = parse_form_data(self.environ)
         return self._form
 
     @lazy_property
     def file(self):
+        if self.method not in ('POST', 'PUT'):
+            return {}
+
         d = self.__dict__
-        d['_form'], d['_file'] = parse_form_data(self.environ)
+        if '_file' not in d:
+            d['_form'], d['_file'] = parse_form_data(self.environ)
         return self._file
 
 
