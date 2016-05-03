@@ -10,7 +10,7 @@ def http_key(key):
 
 
 class Header(object):
-    """Store response header.
+    """Store response header, Also be used in request._form and request._file.
     Header class support three ways to initialize:
     1. Supply a dict object
     2. DO NOT Supply a dict or list object, but gives key-value pairs
@@ -19,9 +19,14 @@ class Header(object):
     Data-structure:
     self._list = [(key1, value1), (key2, value2), ...]
     """
-    def __init__(self, _dict_list=None, *args, **kwargs):
+    def __init__(self, _dict_list=None, base=True, *args, **kwargs):
         # self._list = [(key, value), (key, value), ...]
         self._list = []
+
+        # Flag for judge whether this class is used to be a instance of HTTP Header.
+        # Currently, it is useful when Header class is used in request._form and request._file
+        self.base = base
+
         if not _dict_list:
             for key, value in dict(*args, **kwargs).iteritems():
                 self._list.append((key, value))
@@ -40,7 +45,7 @@ class Header(object):
         if isinstance(key, int):
             self._list[key] = value
         else:
-            key = http_key(key)
+            key = http_key(key) if self.base else key
             for _id, (_key, _value) in enumerate(self._list):
                 if _key == key:
                     self._list[_id] = (_key, str(_value))
@@ -51,7 +56,7 @@ class Header(object):
     def __getitem__(self, item):
         if isinstance(item, int):
             return self._list[item]
-        item = http_key(item)
+        item = http_key(item) if self.base else item
         for key, value in self._list:
             if key == item:
                 return value
@@ -60,7 +65,7 @@ class Header(object):
         if isinstance(key, int):
             del self._list[key]
         else:
-            key = http_key(key)
+            key = http_key(key) if self.base else key
             for _id, _key, _value in enumerate(self._list):
                 if key == _key:
                     del self._list[_id]
@@ -70,6 +75,13 @@ class Header(object):
 
     def add(self, key, value):
         self._list.append((key, value))
+
+    def get(self, key):
+        key = http_key(key) if self.base else key
+        for _key, _value in self._list:
+            if _key == key:
+                return _value
+        return None
 
     def head_to_list(self, charset='utf-8'):
         result = []
@@ -141,8 +153,8 @@ class IterStream(object):
         line = self.readline()
         if not line:
             raise StopIteration()
-        if line[-2:] == '\r\n':
-            return line[:-2]
+        # if line[-2:] == '\r\n':
+        #     return line[:-2]
         return line
 
     def read(self, size=CHUNK_SIZE):
@@ -164,6 +176,10 @@ class IterStream(object):
 
         self._pos += len(line)
         return line
+
+    @property
+    def is_exhausted(self):
+        return self._pos >= self.end
 
 
 class File(object):
