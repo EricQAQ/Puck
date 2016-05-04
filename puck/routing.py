@@ -2,7 +2,7 @@
 import re
 from urllib import urlencode
 
-#from .exceptions import NotFound, MethodNotAllowed
+from .exceptions import NotFound, MethodNotAllowed
 
 # this regular expression for matching dynamic routing rule.
 # Ex: /example/<int:test>
