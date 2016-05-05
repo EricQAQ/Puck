@@ -2,8 +2,8 @@
 import urlparse
 import tempfile
 
-from .utils import parse_header_line, parse_dict_string
-from .data_structures import IterStream, File
+from .utils import parse_header_line, parse_dict_string, parse_multipart_headers
+from .data_structures import IterStream, File, Header
 
 
 def valid_boundary(s, _vb_pattern="^[ -~]{0,200}[!-~]$"):
@@ -37,6 +37,7 @@ def parse_form_data(environ):
     elif content_type == 'application/x-www-form-urlencoded':
         # POST or PUT Request just submit a form, without a file.
         _form = read_urlencoded(environ['wsgi.input'].read(content_length))
+        _file = None
     else:
         pass
 
@@ -79,23 +80,25 @@ def parse_multipart(file, content_length, boundary):
     last_boundary = real_boundary + '--'
 
     file = IterStream(file, content_length)
-    _form = []
-    _file = []
+    _form = Header(base=False)
+    _file = Header(base=False)
 
     exit_flag = False
 
-    line = file.next()      # boundary
+    line = file.next().rstrip()      # boundary
 
     if line != real_boundary:
         raise ValueError('Cannot found boundary in the start of data.')
 
     while not exit_flag:
-        sub_header = file.next()    # Content-Disposition: form-data; name="file"; filename="chrome.png"
-        sub_header = parse_header_line(sub_header)
-        if sub_header[0] != 'Content-Disposition: form-data':
+        # sub_header = file.next()    # Content-Disposition: form-data; name="file"; filename="chrome.png"
+        # sub_header = parse_header_line(sub_header)
+        sub_header_list, sub_header_dict = parse_multipart_headers(file)
+        if sub_header_list[0] != 'Content-Disposition: form-data':
             raise ValueError('Missing Content-Disposition header.')
-        name = sub_header[1].get('name')
-        filename = sub_header[1].get('filename')
+
+        name = sub_header_dict.get('name')
+        filename = sub_header_dict.get('filename')
 
         if filename is None:
             is_file = False
@@ -103,28 +106,42 @@ def parse_multipart(file, content_length, boundary):
             _write = container.append
         else:
             is_file = True
-            content_type = parse_dict_string(parse_header_line(file.next())[0]).get('Content-Type')
-            container = tempfile.TemporaryFile()
+            # content_type = parse_dict_string(parse_header_line(file.next())[0]).get('Content-Type')
+            content_type = parse_dict_string(sub_header_list[1])
+            container = tempfile.TemporaryFile('wb+')
             _write = container.write
 
+        buf = ''
         for line in file:
-            if line == real_boundary:
-                break
-            if line == last_boundary:
-                exit_flag = True
-                break
-            if not line:    # blank line
-                continue
+            if line[:2] == '--':
+                line = line.rstrip()
+                if line == real_boundary:
+                    break
+                if line == last_boundary:
+                    exit_flag = True
+                    break
+
+            # if not line:    # blank line
+            #     continue
+
+            if buf:
+                _write(buf)
+                buf = ''
 
             if line[-2:] == '\r\n':
+                buf = '\r\n'
                 _write(line[:-2])
+            elif line[-1:] == '\n':
+                buf = '\n'
+                _write(line[:-1])
             else:
-                _write(line[:])
+                _write(line)
 
         if is_file:
-            _file.append((name, File(container, filename, content_type)))
+            container.seek(0)
+            _file.add(name, File(container, filename, content_type))
         else:
-            _form.append((name, container))
+            _form.add(name, container)
 
     return _form, _file
 
@@ -142,7 +159,7 @@ def read_urlencoded(s, keep_blank_values=0, strict_parsing=0):
     :param s: the string will be parsed, Usually is environ['wsgi.input']
     :param keep_blank_values: whether keep blank or not
     """
-    _list = []
+    _form = Header(base=False)
     for key, value in urlparse.parse_qsl(s, keep_blank_values, strict_parsing):
-        _list.append((key, value))
-    return _list
+        _form.add(key, value)
+    return _form
