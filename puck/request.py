@@ -43,7 +43,8 @@ class BaseRequest(object):
     @lazy_property
     def cookies(self):
         """return the cookie.
-        The cookie is a dict, user can get the key and value in dict way"""
+        The cookie is a dict, user can get the key and value in dict way.
+        The key is the cookie name, the value is the cookie value, not the instance of Morsel"""
         return parse_cookie(self.environ)
 
     @lazy_property
