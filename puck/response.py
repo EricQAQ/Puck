@@ -76,6 +76,7 @@ class BaseResponse(object):
 
     @property
     def cookies(self):
+        """self._cookies is a dict, key: cookie name, value: a instance of Morsel."""
         if not self._cookies:
             self._create_cookie()
         return self._cookies
@@ -127,7 +128,7 @@ class BaseResponse(object):
         use this func to get attribute which name is ' _list '.
         """
         for item in self.cookies:
-            self.header.add('Set-Cookie', item.OutputString())
+            self.header.add('Set-Cookie', self.cookies[item].OutputString())
         if self.is_sequence and 'Content-Length' not in self.header:
             try:
                 content_length = sum((len(str(item))) for item in self.response)

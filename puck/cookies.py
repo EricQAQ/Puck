@@ -21,10 +21,14 @@ def set_cookie_date(expires):
 
 
 def parse_cookie(environ):
+    """Parse the cookie from request.
+
+    :return A dict(key: cookie name, value: the cookie value, not the instance of Morsel)
+    """
     raw_cookie = SimpleCookie(environ.get('HTTP_COOKIE', ''))
     cookie = {}
     for key, value in raw_cookie.iteritems():
-        cookie[key] = value
+        cookie[key] = value.OutputString()[len(key)+1:]
     return cookie
 
 
