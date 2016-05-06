@@ -29,7 +29,7 @@
     SOFTWARE.
 """
 
-version_info = (0, 1, 0)
+version_info = (0, 1, 1)
 
 __author__ = 'Eric Zhang'
 __version__ = ".".join([str(v) for v in version_info])
@@ -42,5 +42,5 @@ from .app import Puck
 from .helper import jsonify, api_response, make_response
 from .request import Request
 from .response import Response
-from .globals import current_app, request
+from .globals import current_app, request, session
 from .exceptions import HTTPException
