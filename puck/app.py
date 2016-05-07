@@ -3,9 +3,14 @@ from .request import Request
 from .response import Response
 from .routing import Router
 from .constants import HTTP_CODES
+from .session import RedisPickleSession
 from .globals import request_stack, request
 
 from .exceptions import HTTPException, NotFound, MethodNotAllowed
+
+
+# the default secure key, if secure_key is not set, use this constant to set it.
+DEFAULT_SECURE_KEY = 'Puck'
 
 
 class Puck(object):
@@ -13,7 +18,21 @@ class Puck(object):
     request_class = Request
     response_class = Response
 
-    def __init__(self):
+    def __init__(self, redis_host=None, redis_port=None,
+                 session_key='session_id', secure_key=None):
+
+        # the secure_key, which will be used to sign.
+        self.secure_key = secure_key if secure_key else DEFAULT_SECURE_KEY
+
+        # the name of session_id, default value is 'session_id'
+        self.session_key = session_key
+
+        # the type of sessions' storage, currently Puck support to use Redis to
+        # save the session.
+        self.session_type = RedisPickleSession(
+            redis_host=redis_host, redis_port=redis_port,
+            secure_key=self.secure_key, key=session_key
+        )
 
         self.url_handler_map = Router()
 
@@ -80,15 +99,38 @@ class Puck(object):
                 return result
 
     def process_after_request(self, response):
+        """This function will be called after handling the request
+        and make the response.All these functions
+        are stored in a list named "after_request_funcs.
+        If the session is not None, the session will be saved.
+
+        :param response: the ojbect of response. Always the return
+                         value of make_respose
+        """
+        _session = request_stack.top.session
+        if _session is not None:
+            self.save_session(_session, response)
         for func in self.after_request_funcs:
             response = func(response)
         return response
 
-    def get_session(self):
-        pass
+    def get_session(self, request):
+        """Get the current session in current request.
+        If the session is not exist, it will create a new session.
 
-    def save_session(self):
-        pass
+        :param request: an instance of request_class.
+        """
+        if self.secure_key:
+            return self.session_type.load_session(request, self.session_key)
+
+    def save_session(self, session, response):
+        """Saves the session if it needs updates.
+
+        :param session: the session will be saved
+        :param response: the response object, the instance of response_class
+        """
+        if session is not None:
+            self.session_type.save_session(session, response)
 
     def make_response(self, response):
         """
@@ -170,7 +212,7 @@ class _RequestStack(object):
     def __init__(self, app, environ):
         self.app = app
         self.request = app.request_class(environ)
-        self.session = app.get_session()
+        self.session = app.get_session(self.request)
 
     def __enter__(self):
         request_stack.push(self)

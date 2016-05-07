@@ -32,3 +32,4 @@ class Proxy(object):
 request_stack = LocalStack()
 current_app = Proxy(lambda: request_stack.top.app)
 request = Proxy(lambda: request_stack.top.request)
+session = Proxy(lambda: request_stack.top.session)
