@@ -3,6 +3,8 @@ from datetime import datetime
 from time import time, gmtime
 from Cookie import SimpleCookie, Morsel
 
+from .utils import parse_header_line, parse_dict_string
+
 
 def set_cookie_date(expires):
     """Outputs a string in the format " Thu, DD-MM-YYYY HH:MM:SS GMT "."""
@@ -24,11 +26,17 @@ def parse_cookie(environ):
     """Parse the cookie from request.
 
     :return A dict(key: cookie name, value: the cookie value, not the instance of Morsel)
+            The cookies should be like this:
+            {'session_id': '1', 'test': 'xxx'}
+
     """
     raw_cookie = SimpleCookie(environ.get('HTTP_COOKIE', ''))
     cookie = {}
     for key, value in raw_cookie.iteritems():
-        cookie[key] = value.OutputString()[len(key)+1:]
+        # cookie[key] = value.OutputString()[len(key)+1:]
+        cookie_str = value.OutputString()
+        k, v = parse_dict_string(cookie_str, split_sign='=', use_tuple=True)
+        cookie[k] = v
     return cookie
 
 
