@@ -32,7 +32,6 @@ class SessionBase(object):
 
     def __setitem__(self, key, value):
         self.data[key] = value
-        print self.data
 
     def get(self, item):
         return self.__getitem__(item)
@@ -45,7 +44,8 @@ class SessionBase(object):
 
 
 class PickleMixin:
-    """Use pickle to serialize or unserialize the data."""
+    """A mixin for classes which can use pickle to
+    serialize or unserialize the data."""
 
     serialization_method = pickle
 
@@ -57,27 +57,71 @@ class PickleMixin:
 
 
 class DictMixin:
+    """A mixin for classes which can use dict to
+    serialize or unserialize the data."""
 
     def serialize(self, data):
-        pass
+        """Convert the data into a dict."""
+        if data:
+            try:
+                return dict(data)
+            except (TypeError, ValueError):
+                raise ValueError('The data cannot be converted into a dict.')
 
     def unserialize(self, rawdata):
-        pass
+        """Convert the data into a dict."""
+        if rawdata:
+            try:
+                return dict(rawdata)
+            except (TypeError, ValueError):
+                raise ValueError('The data cannot be converted into a dict.')
 
 
 class StoreSessionBase(object):
+    """The base class for redis serialization.
+    The sub class should be overridden following methods:
+
+    - save_session()
+    - load_session()
+    """
 
     @abc.abstractmethod
-    def save_session(self, session, response, expire, path, domain, secure, httponly):
+    def save_session(self, session, response, expire,
+                     path, domain, secure, httponly):
+        """Saves the session in a cookie on response object if it needs
+        updates.
+
+        :param session: the session to be saved.
+        :param response: a response object that has a
+                         BaseResponse.set_cookie method.
+        :param expire: should be a `datetime` object or UNIX timestamp.
+        :param path: limit the cookie to the given path.
+        :param domain: set a cross-domain cookie. Example:
+                       domain=".example.com", it will set the cookie that is
+                       readable by the domain "www.example.com"
+        :param secure: The cookie will only be available via HTTPS.
+        """
         pass
 
     @abc.abstractmethod
-    def load_session(self, request, session_id):
+    def load_session(self, request, key):
+        """Loads the session from the request.
+        If the session is not exist, create a new session and return it.
+
+        :param request: a request object that has a `cookies` attribute.
+        :param key: the name of the session id in cookie.
+        """
         pass
 
 
 class RedisSession(StoreSessionBase):
     """Use Redis to store sessions."""
+    # use hash type to store the session
+    hash_type = 'hash'
+
+    # use string type to store the seesion
+    string_type = 'string'
+
     def __init__(self, redis_host, redis_port, secure_key, key,
                  redis_db=0, redis_pw=None, use_pool=False, redis=None, max_conn=None):
         """Init redis session.
@@ -125,10 +169,13 @@ class RedisSession(StoreSessionBase):
                 session_id = None
         if not session_id:  # the session is not exists, create a new session
             return self.make_session(self.key, self.secure_key)
-
-        rawdata = self.redis.get(session_id)      # str
-        if not rawdata:
+        data_type = self.redis.type(session_id)
+        if data_type == self.string_type:
+            rawdata = self.redis.get(session_id)      # str
+        elif data_type == self.hash_type:
             rawdata = self.redis.hgetall(session_id)  # dict
+        else:
+            rawdata = None
 
         if not rawdata:    # the session is not exists, create a new session
             return self.make_session(self.key, self.secure_key)
