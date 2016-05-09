@@ -19,7 +19,7 @@ class Puck(object):
     request_class = Request
     response_class = Response
 
-    def __init__(self, redis_host=None, redis_port=None,
+    def __init__(self, redis_host='127.0.0.1', redis_port=6379,
                  session_key='session_id', secure_key=None):
 
         # the secure_key, which will be used to sign.
