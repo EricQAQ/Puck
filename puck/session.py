@@ -2,9 +2,13 @@
 import abc
 import uuid
 import time
+from datetime import datetime
 from hashlib import sha1
 import pickle
 from itsdangerous import Signer, BadSignature
+
+from .utils import get_utc_time_stamp
+from .cookies import cookie_serialize, cookie_unserialize
 
 
 class SessionBase(object):
@@ -75,6 +79,17 @@ class DictMixin:
                 return dict(rawdata)
             except (TypeError, ValueError):
                 raise ValueError('The data cannot be converted into a dict.')
+
+
+def get_expire_seconds(session_expire):
+    """Get the expire seconds.
+
+    :param session_expire: the session expire time
+    """
+    session_expire = get_utc_time_stamp(int(session_expire))
+    current_timestamp = get_utc_time_stamp(datetime.utcnow())
+    seconds = session_expire - current_timestamp
+    return seconds
 
 
 class StoreSessionBase(object):
@@ -155,20 +170,27 @@ class RedisSession(StoreSessionBase):
         return SessionBase(key=key, secure_key=secure_key)
 
     def load_session(self, request, key):
-        """Load session from the request.
+        """Load session from the request. If the session is not exist, create a new session.
 
         :param request: the request object
         :param key: the session name in cookies of the request.
         """
-        session_id = request.cookies.get(key)
-        signer = Signer(secret_key=self.secure_key)
-        if session_id is not None:
-            try:
-                session_id = signer.unsign(session_id).decode('utf-8')
-            except BadSignature:
-                session_id = None
+        session_raw = request.cookies.get(key)
+
+        if session_raw:
+            session_id, session_expire = cookie_unserialize(session_raw, self.secure_key)
+        else:
+            session_id = session_expire = None
         if not session_id:  # the session is not exists, create a new session
             return self.make_session(self.key, self.secure_key)
+
+        # the flag that whether delete the key from redis
+        del_flag = False
+
+        if session_expire:  # has expire time
+            if get_expire_seconds(session_expire) < 0:    # the session has expired, del from redis
+                del_flag = True
+
         data_type = self.redis.type(session_id)
         if data_type == self.string_type:
             rawdata = self.redis.get(session_id)      # str
@@ -177,7 +199,12 @@ class RedisSession(StoreSessionBase):
         else:
             rawdata = None
 
-        if not rawdata:    # the session is not exists, create a new session
+        if rawdata is not None and del_flag:    # del from redis
+            self.redis.delete(session_id)
+            rawdata = None
+
+        # the session is not exists, create a new session
+        if not rawdata:
             return self.make_session(self.key, self.secure_key)
 
         data = self.unserialize(rawdata)
@@ -189,11 +216,15 @@ class RedisSession(StoreSessionBase):
         session_id = session.get(self.key)
         serialized_session = self.serialize(session.data)
 
+        if expire:
+            expire = get_utc_time_stamp(expire)
+            expire_second = get_expire_seconds(expire)
+
         if not expire:
-            serialied_type = self.redis.set   # 0: string, 1: dict
+            serialied_type = self.redis.set   # default: string
             if isinstance(serialized_session, dict):
                 serialied_type = self.redis.hmset
-
+            # store the session into redis
             serialied_type(session_id, serialized_session)
 
         else:
@@ -203,14 +234,13 @@ class RedisSession(StoreSessionBase):
                 serialied_type = pipe.hmset
 
             serialied_type(session_id, serialized_session)
-            pipe.expire(session_id, expire)
+            pipe.expire(session_id, expire_second)
             pipe.execute()
 
-        signer = Signer(self.secure_key)
-        session_id = signer.sign(session_id.encode('utf-8')).decode('utf-8')
+        session_data = cookie_serialize(self.secure_key, session_id, expire)
 
         response.set_cookies(
-            key=self.key, value=session_id, expires=expire, path=path,
+            key=self.key, value=session_data, expires=expire, path=path,
             domain=domain, secure=secure, httponly=httponly
         )
 

@@ -7,6 +7,7 @@ from .session import RedisPickleSession
 from .globals import request_stack, request
 
 from .exceptions import HTTPException, NotFound, MethodNotAllowed
+from .utils import local_time_2_utc, get_after_input_time
 
 
 # the default secure key, if secure_key is not set, use this constant to set it.
@@ -123,14 +124,20 @@ class Puck(object):
         if self.secure_key:
             return self.session_type.load_session(request, self.session_key)
 
-    def save_session(self, session, response):
+    def save_session(self, session, response, expire=None, path=None,
+                     domain=None, secure=None, httponly=False):
         """Saves the session if it needs updates.
 
         :param session: the session will be saved
         :param response: the response object, the instance of response_class
+        :param expire: the expire time, an instance of datetime
         """
+        if expire:
+            real_expire_time = get_after_input_time(expire)
+            expire = local_time_2_utc(real_expire_time)
         if session is not None:
-            self.session_type.save_session(session, response)
+            self.session_type.save_session(session, response, expire, path,
+                                           domain, secure, httponly)
 
     def make_response(self, response):
         """
