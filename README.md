@@ -1,7 +1,7 @@
 # Puck
 [![Puck](https://img.shields.io/badge/Puck-v0.1.2-orange.svg)]()
---
-![pic](https://github.com/EricQAQ/Puck/blob/master/docs/Puck.png)
+
+![pic](https://github.com/EricQAQ/Puck/blob/master/docs/Puck.jpg)
 
 Puck is a micro web framework for developers to build restful api quickly.
 

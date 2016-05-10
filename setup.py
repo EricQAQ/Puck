@@ -20,8 +20,7 @@ setup(
     author='Eric Zhang',
     author_email='eric.pucker@gmail.com',
     description='A web micro-frame, quickly developing restful api.',
-    packages=find_packages('puck'),
-    package_dir={'': 'puck'},
+    packages=find_packages(),
     zip_safe=False,
     platforms='any',
     install_requires=[
