@@ -20,7 +20,7 @@ _rule_re = re.compile(r'''
 _type_map = {
     'int': r'\d+',
     'float': r'\d+(?:\.\d+)',
-    'str': r'[\w-]+',
+    'str': r'(?=.*[a-z])[\w-]+',
 }
 
 
@@ -65,6 +65,8 @@ class Rule(object):
 
         # the support methods of the rule
         self.methods = set(item.upper() for item in methods)
+        if 'GET' in self.methods and 'HEAD' not in methods:
+            self.methods.add('HEAD')
 
         # flag for judge whether the rule is a dynamic rule
         self.dynamic = False
@@ -128,7 +130,8 @@ class Rule(object):
         variable_dict = self.get_variables()
         unknown_variable = set()
         # check type and find out unknown variable
-        for key, value in kwargs:
+        for key in kwargs:
+            value = kwargs[key]
             if key in variable_dict and \
                     not isinstance(value, variable_dict[key]):
                 raise TypeError
@@ -189,7 +192,12 @@ class Rule(object):
 class Router(object):
 
     def __init__(self):
+        # the mapping list: Rule -> rule_name,
+        # structure like this: [(name1, Rule()), (name2, Rule()), ...]
         self.route_to_name = []
+
+        # the mapping list: rule_name -> function,
+        # structure like this: [(name1, func1), (name2, func2), ...]
         self.name_to_func = []
 
     def add(self, url, handler, **kwargs):
@@ -219,16 +227,36 @@ class Router(object):
 
     def match_url(self, url, method):
         """According the request url, to matching the handler.
-        :return: (function, methods, params)"""
+        :return: (function, a dict that the key is rule param)"""
         for rule_name, rule in self.route_to_name:
             m = rule.rule_re.match(url)
             if m is not None:
                 func = self._search_func(rule_name)
                 if method not in rule.methods:
                     raise MethodNotAllowed()
-                return func, m.groupdict()
+                return func, self._convert_type(m.groupdict(), rule)
         raise NotFound()
         # return None, None, None
+
+    def _convert_type(self, pair_dict, rule):
+        """Convert the value into the original type. Example:
+
+        One rule string is '/example/<int:b>'. And '/example/22' matches it.
+        But through self.match_url function, the key-value dict is {'b': '22'},
+        calling this method, the dict will be changed to {'b': 22}
+
+        :param pair_dict: the dict which need to convert the values type into
+                          its original type.
+        :param rule: the rule that matches the url.
+
+        :return A dict
+        """
+        _dict = {}
+        for key in pair_dict:
+            value = pair_dict[key]
+            if key in rule.type_variable:
+                _dict[key] = rule.type_variable[key](value)
+        return _dict
 
     def _search_func(self, name):
         for _name, func in self.name_to_func:
