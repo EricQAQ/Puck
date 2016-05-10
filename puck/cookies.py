@@ -3,6 +3,10 @@ from datetime import datetime
 from time import time, gmtime
 from Cookie import SimpleCookie, Morsel
 
+from itsdangerous import Signer, BadSignature
+
+from .utils import parse_dict_string
+
 
 def set_cookie_date(expires):
     """Outputs a string in the format " Thu, DD-MM-YYYY HH:MM:SS GMT "."""
@@ -24,11 +28,17 @@ def parse_cookie(environ):
     """Parse the cookie from request.
 
     :return A dict(key: cookie name, value: the cookie value, not the instance of Morsel)
+            The cookies should be like this:
+            {'session_id': '1', 'test': 'xxx'}
+
     """
     raw_cookie = SimpleCookie(environ.get('HTTP_COOKIE', ''))
     cookie = {}
     for key, value in raw_cookie.iteritems():
-        cookie[key] = value.OutputString()[len(key)+1:]
+        # cookie[key] = value.OutputString()[len(key)+1:]
+        cookie_str = value.OutputString()
+        k, v = parse_dict_string(cookie_str, split_sign='=', use_tuple=True)
+        cookie[k] = v
     return cookie
 
 
@@ -67,4 +77,26 @@ def generate_cookie(key, value, expires=None, path='/', domain=None,
             morsel[key] = value
 
     return morsel
+
+
+def cookie_serialize(secure_key, session_id, expire):
+    """Serialize the cookie. Set the expire_time timestamp into the cookie"""
+    signer = Signer(secure_key)
+    session_data = session_id.encode('utf-8') + '&' + str(expire)
+
+    session_data = signer.sign(session_data).decode('utf-8')
+    return session_data
+
+
+def cookie_unserialize(session_data, secure_key):
+    """Unserialize the cookie: separate the session_id and expire_time timestamp."""
+    signer = Signer(secret_key=secure_key)
+    try:
+        session_data = signer.unsign(session_data).decode('utf-8')
+    except BadSignature:
+        session_data = None
+    if not session_data:
+        return None, None
+    session_id, session_expire = session_data.split('&')
+    return session_id, session_expire
 
