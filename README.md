@@ -1,116 +1,58 @@
 # Puck
-
+[![Puck](https://img.shields.io/badge/Puck-v0.1.2-orange.svg)]()
+--
 ![pic](https://github.com/EricQAQ/Puck/blob/master/docs/Puck.png)
 
 Puck is a micro web framework for developers to build restful api quickly.
 
-## Quickly Use
 
-### 1. Hello world
+## why Puck?
 
-It is easy to use Puck to build web api, just need 14 lines you can building a hello world api!
+1. brief code to build restful api
+2. easy to learn and to use
+3. focus on restful web api, easy to return JSON object
+4. router system is convenient, support dynamic router
+5. Default use Redis to store session
 
-```python
-from puck import Puck, api_response, request
+## Before use Puck
 
-app = Puck()
+1. install Redis and start it.
 
-@app.route('/', methods=['GET'])
-def hello():
-    return api_response(
-        data={
-            'test': 'hello world!'
-        }
-    )
+    ```
+    wget http://download.redis.io/redis-stable.tar.gz
+    tar xvzf redis-stable.tar.gz
+    cd redis-stable
+    make
+    ```
+    if you uses mac OSX, you can install like this:
 
-if __name__ == '__main__':
-    app.run()
-```
+    ```
+    brew install redis
+    ```
 
-### 2. Dynamic router
+    start it:
 
-In Puck, it support *three types* in Dynamic router: int, string, float.
-You can build a dynamic router like this:
+    ```
+    $ redis-server
+    ```
+2. install puck
 
-```python
-@app.route('/<str:name>')
-def hello_name(name):
-    return 'hello, %s' % name
-```
-and this:
+    you can use pip to install it:
 
-```python
-@app.route('/<int:age>/<int:salary>')
-def hello_file(age, salary):
-    return 'hello, visiter. Your age is %s, salary is %s' % (age, salary)
-```
+    ```
+    $ pip install puck
+    ```
 
-### 3. Before and After handling
+    or you can install from source code:
 
-If you want to do something before Puck handling the client's request, do it like this:
+    ```
+    $ git clone https://github.com/EricQAQ/Puck
+    $ cd Puck
+    $ python setup.py install
+    ```
 
+## How to use
 
-```python
-@app.before_request
-def print_hello():
-    print 'Before_request is running!'
-```
+The tutorial is [here](https://github.com/EricQAQ/Puck/wiki/Quickly-Start)
 
-So, when the request is coming, 'Before_request is running!' will print out.
-
-
-If you want to do something after Puck handling the client's request, do it like this:
-
-```python
-@app.after_request
-def after_resp(response):
-    print 'After_request is running!'
-    return response
-```
-The param `response` is necessary~
-
-### 4. Session
-Puck support Redis to store the session. SO PLEASE BE SURE TO INSTALL REDIS before starting Puck's app.
-
-Currently, the default redis host is `127.0.0.1`, port is `6379`, if you do not use this, you can build app like this:
-
-```python
-from puck import Puck, api_response, request, session
-
-app = Puck(redis_host='127.0.0.1', redis_port=6379)
-
-@app.route('/', methods=['GET'])
-def index():
-    return api_response(data=session.data, message='this is the session.')
-
-if __name__ == '__main__':
-    app.run()
-```
-
-### 5. Requst, session and so on
-
-Puck's context uses the trickly in Flask, you can directly get request object like this:
-
-```python
-from puck import request
-```
-and session:
-
-```python
-from puck import session
-```
-and current app:
-
-```python
-from puck import current_app
-```
-
-In request, you can:
-
-1. get cookies like this: `request.cookies`, 
-2. get request method like this: `request.method`
-3. get header like this: `request.header`
-4. get request address like this `request.request_addr`
-5. get content type like this `request.content_type`
-6. get request form like this `request.form`
-7. get upload file like this `request.file`
+If you think Puck is good, Plz START~~ :relaxed::relaxed:

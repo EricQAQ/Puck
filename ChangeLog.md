@@ -1,9 +1,11 @@
 #Puck
 
 
-###0.1.2 / 2016-05-09
+
+### 0.1.2 / 2016-05-10
 ==================
 
+  * Fix: The match url bug when the dynamic part in url is string or int.
   * Add setup
   * Enhance: Convert the sessions expire time into utc
   * Fix: Cookies dict in request.
@@ -11,7 +13,7 @@
   * Feature: Support session, which use redis to store.
 
 
-###0.1.1 / 2016-05-07
+### 0.1.1 / 2016-05-07
 ==================
 
   * Enhance: the proxy support operate the real object behind it.
