@@ -40,7 +40,7 @@ Puck is a micro web framework for developers to build restful api quickly.
     you can use pip to install it:
 
     ```
-    $ pip install puck
+    $ pip install pucks
     ```
 
     or you can install from source code:
