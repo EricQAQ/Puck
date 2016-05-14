@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
 
+HTTP_METHODS = (
+    'CONNECT',
+    'DELETE',
+    'GET',
+    'HEAD',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+    'TRACE',
+)
+
+
 HTTP_CODES = {
     100:    'Continue',
     101:    'Switching Protocols',

@@ -13,7 +13,7 @@ def _get_version():
 
 
 setup(
-    name='Puck',
+    name='Pucks',
     version=_get_version(),
     url='https://github.com/EricQAQ/Puck',
     license='MIT',

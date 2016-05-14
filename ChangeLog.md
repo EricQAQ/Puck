@@ -2,6 +2,16 @@
 
 
 
+### 0.1.3 / 2016-05-14
+==================
+
+  * Add examples
+  * Enhance: Support class sytle to build apis
+  * Feature: support restful style to bulid apis.
+  * Fix: when content_type is multipart/form-data, the request.form[xx] should be a string.
+  * Fix session bug when expire=None
+
+
 ### 0.1.2 / 2016-05-10
 ==================
 

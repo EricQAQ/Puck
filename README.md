@@ -1,5 +1,5 @@
 # Puck
-[![Puck](https://img.shields.io/badge/Puck-v0.1.2-orange.svg)]()
+[![Puck](https://img.shields.io/badge/Puck-v0.1.3-orange.svg)]()
 
 ![pic](https://github.com/EricQAQ/Puck/blob/master/docs/Puck.jpg)
 
@@ -40,7 +40,7 @@ Puck is a micro web framework for developers to build restful api quickly.
     you can use pip to install it:
 
     ```
-    $ pip install puck
+    $ pip install pucks
     ```
 
     or you can install from source code:
