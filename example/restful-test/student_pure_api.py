@@ -11,13 +11,17 @@ class Student(RequestParamParser):
     address = Param('address', str)
 
 
-app = Puck()
+app = Puck(use_api=True)
 
 
-@app.route('/student', methods=['POST'])
-@variable_parser(Student)
-def test(variable_data):
-    return api_response(data=variable_data)
+class StudentAPI(object):
+
+    @variable_parser(Student)
+    def post(self, i):
+        variable_data = getattr(self, 'variable_data')
+        return api_response(data=variable_data)
+
+app.add_route('/stu/<int:i>', resource=StudentAPI())
 
 
 if __name__ == '__main__':
