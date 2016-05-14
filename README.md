@@ -1,5 +1,5 @@
 # Puck
-[![Puck](https://img.shields.io/badge/Puck-v0.1.2-orange.svg)]()
+[![Puck](https://img.shields.io/badge/Puck-v0.1.3-orange.svg)]()
 
 ![pic](https://github.com/EricQAQ/Puck/blob/master/docs/Puck.jpg)
 
