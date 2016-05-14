@@ -3,6 +3,7 @@ import re
 from urllib import urlencode
 
 from .exceptions import NotFound, MethodNotAllowed
+from .constants import HTTP_METHODS
 
 # this regular expression for matching dynamic routing rule.
 # Ex: /example/<int:test>
@@ -193,12 +194,18 @@ class Router(object):
 
     def __init__(self):
         # the mapping list: Rule -> rule_name,
-        # structure like this: [(name1, Rule()), (name2, Rule()), ...]
+        # structure like this: [(Rule(), name1), (Rule(), name2), ...]
         self.route_to_name = []
 
         # the mapping list: rule_name -> function,
         # structure like this: [(name1, func1), (name2, func2), ...]
         self.name_to_func = []
+
+        # ONLY used when the user prepare to use api(Puck.use_api=True).
+        # the mapping list: route -> http_methods_map,
+        # structure like this:
+        # [(Rule(), {'POST': <function post>, 'GET': <function get>}), ..]
+        self.route_to_http_methods = []
 
     def add(self, url, handler, **kwargs):
         """Add new url rule. Called by add_route in Puck.
@@ -214,26 +221,47 @@ class Router(object):
             methods.add('HEAD')
         rule = Rule(rule_str=url, rule_name=rule_name, methods=methods)
 
-        self.route_to_name.append((rule_name, rule))
+        self.route_to_name.append((rule, rule_name))
         self.name_to_func.append((rule_name, handler))
+
+    def add_resource(self, url, resource):
+        """ONLY used when the user prepare to use api(Puck.use_api=True).
+
+        :param url: the url rule will be added.
+        :param resource: the instance of resource
+        """
+        http_methods_map = create_http_method_map(resource)
+        http_methods = http_methods_map.keys()
+
+        rule = Rule(rule_str=url, rule_name=resource.__class__.__name__,
+                    methods=http_methods)
+        self.route_to_http_methods.append((rule, http_methods_map))
 
     def url_for(self, rule_name, **kwargs):
         """According to the giving rule name(default value is function name)
         and params, build the url which matches the function."""
-        for _rule_name, rule in self.route_to_name:
+        for rule, _rule_name in self.route_to_name:
             if _rule_name == rule_name:
                 return rule.build_url(**kwargs)
         return ''
 
     def match_url(self, url, method):
         """According the request url, to matching the handler.
-        :return: (function, a dict that the key is rule param)"""
-        for rule_name, rule in self.route_to_name:
+
+        :return: (function, a dict that the key is rule param)
+        """
+        attribute = 'route_to_name'
+        if self.route_to_http_methods:
+            attribute = 'route_to_http_methods'
+
+        # if when the user prepare to use api(Puck.use_api=True), part_2 is a dict: http_methods
+        # else part_2 is a rule name
+        for rule, part_2 in getattr(self, attribute):
             m = rule.rule_re.match(url)
             if m is not None:
-                func = self._search_func(rule_name)
                 if method not in rule.methods:
                     raise MethodNotAllowed()
+                func = self._search_func(part_2, method)
                 return func, self._convert_type(m.groupdict(), rule)
         raise NotFound()
         # return None, None, None
@@ -258,8 +286,28 @@ class Router(object):
                 _dict[key] = rule.type_variable[key](value)
         return _dict
 
-    def _search_func(self, name):
-        for _name, func in self.name_to_func:
-            if name == _name:
-                return func
-        return None
+    def _search_func(self, name, method):
+        if not self.route_to_http_methods:
+            for _name, func in self.name_to_func:
+                if name == _name:
+                    return func
+            return None
+        return name[method]
+
+
+def create_http_method_map(resource):
+    """Scan the resource, and collect the functions of the http methods.
+
+    :param resource: the instance of resource
+
+    :return a dict, it will be like this: {'POST': <function post>, 'GET': <function get>}
+    """
+    http_method_map = {}
+
+    for method in HTTP_METHODS:
+        if hasattr(resource, method.lower()):
+            m = getattr(resource, method.lower())
+            if callable(m):
+                http_method_map[method] = m
+
+    return http_method_map
