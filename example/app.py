@@ -24,7 +24,7 @@ def hello():
             }
         )
     elif request.method == 'POST':
-        file = request.file[0][1]
+        file = request.file['test']
         file.create('/Users/Eric/hahahaha.md')
         return request.file
 

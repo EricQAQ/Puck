@@ -20,7 +20,7 @@ class Puck(object):
     response_class = Response
 
     def __init__(self, redis_host='127.0.0.1', redis_port=6379,
-                 session_key='session_id', secure_key=None):
+                 session_key='session_id', secure_key=None, use_api=False):
 
         # the secure_key, which will be used to sign.
         self.secure_key = secure_key if secure_key else DEFAULT_SECURE_KEY
@@ -49,6 +49,10 @@ class Puck(object):
         # object.
         self.after_request_funcs = []
 
+        # a flag to judge whether the user to build standard api.
+        # if YES, set it to True, else False
+        self.use_api = use_api
+
     def route(self, url, **options):
         """Decorator for request handler. Add rules.
         Same as add_route(url, handler, **optioins)
@@ -63,8 +67,33 @@ class Puck(object):
             return handler
         return wrapper
 
-    def add_route(self, url, handler, **options):
-        """Add new rule to url_handler_map"""
+    def add_route(self, url, handler=None, resource=None, **options):
+        """Add new rule to url_handler_map
+
+        :param url: the route url
+        :param handler: the function which will be called when user visiting THE url.
+                        ONLY used when self.use_api=False
+        :param resource: the instance of resource. ONLY used when self.use_api=True.
+        """
+        if self.use_api:
+            self._add_resource(url, resource)
+        else:
+            self._add_route(url, handler, **options)
+
+    def _add_resource(self, url, resource):
+        """ONLY used when self.use_api=True.
+
+        :param url: the route url
+        :param resource: the instance of resource
+        """
+        self.url_handler_map.add_resource(url, resource)
+
+    def _add_route(self, url, handler, **options):
+        """ONLY used when self.use_api=False
+
+        :param url: the route url
+        :param handler: the function which will be called when user visiting THE url.
+        """
         options.setdefault('methods', ('GET',))
         options.setdefault('rule_name', handler.__name__)
         self.url_handler_map.add(url, handler, **options)

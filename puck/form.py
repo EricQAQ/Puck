@@ -141,7 +141,7 @@ def parse_multipart(file, content_length, boundary):
             container.seek(0)
             _file.add(name, File(container, filename, content_type))
         else:
-            _form.add(name, container)
+            _form.add(name, ''.join(container))
 
     return _form, _file
 
