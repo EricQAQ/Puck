@@ -82,7 +82,8 @@ def generate_cookie(key, value, expires=None, path='/', domain=None,
 def cookie_serialize(secure_key, session_id, expire):
     """Serialize the cookie. Set the expire_time timestamp into the cookie"""
     signer = Signer(secure_key)
-    session_data = session_id.encode('utf-8') + '&' + str(expire)
+    expire_str = str(expire) if expire else ''
+    session_data = session_id.encode('utf-8') + '&' + expire_str
 
     session_data = signer.sign(session_data).decode('utf-8')
     return session_data
