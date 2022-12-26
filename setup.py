@@ -25,7 +25,7 @@ setup(
     platforms='any',
     install_requires=[
         'simplejson==3.8.2',
-        'wheel==0.24.0',
+        'wheel==0.38.1',
         'itsdangerous==0.24.0',
         'redis==2.10.5',
     ],
